@@ -104,11 +104,9 @@ Un mock basado en ESP32 con micrófono que publica este tipo de mensajes puede e
 
 1. `npm install`
 2. `npm run build`
-3. `npm run demo:prepare`
-4. `npm run demo:thumbnails`
-5. `npm run deploy:demo`
+3. `npm run deploy:demo`
 
-El script publica el contenido de `examples/` (incluyendo los assets locales generados) en la rama `gh-pages`, quedando disponible en `https://<tu-usuario>.github.io/butterchurn/examples/demo.html`.
+El script copia los assets y miniaturas, genera `demo-site/` (con `index.html`) y publica esa carpeta en la rama `gh-pages`, quedando disponible en `https://kevinch3.github.io/butterchurn`.
 
 ### Browser Support
 

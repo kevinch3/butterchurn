@@ -23,6 +23,10 @@
       color: #f1f1f1;
     }
 
+    body.fullscreen-fallback-active {
+      overflow: hidden;
+    }
+
     #app {
       min-height: 100vh;
       display: flex;
@@ -225,6 +229,55 @@
       box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
       width: 100%;
       max-width: 100%;
+    }
+
+    #fileDropZone {
+      border: 2px dashed rgba(255, 255, 255, 0.25);
+      border-radius: 16px;
+      padding: 40px 24px;
+      text-align: center;
+      color: #d6d6d6;
+      background: rgba(32, 32, 32, 0.35);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+      transition: border 0.2s ease, background 0.2s ease;
+    }
+
+    #fileDropZone.dragover {
+      border-color: #ff4d4d;
+      background: rgba(255, 77, 77, 0.1);
+    }
+
+    #fileDropZone input[type="file"] {
+      display: none;
+    }
+
+    #fileDropZone button {
+      margin-top: 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      background: rgba(32, 32, 32, 0.85);
+      color: #fff;
+      padding: 10px 22px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    #fileDropZone button:hover {
+      background: rgba(255, 77, 77, 0.85);
+      box-shadow: 0 8px 20px rgba(255, 77, 77, 0.3);
+    }
+
+    #canvasWrapper.fullscreen-fallback {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      max-width: unset;
+      border-radius: 0;
+      box-shadow: none;
+      z-index: 999;
+      background: #000;
     }
 
     #canvas {
@@ -451,12 +504,7 @@
         max-width: none;
         border-left: none;
         border-top: 1px solid #272727;
-        max-height: 320px;
         box-shadow: none;
-      }
-
-      #presetList {
-        max-height: 320px;
       }
     }
 
@@ -509,8 +557,16 @@
       const fullscreenBtn = $('#fullscreenBtn');
       const fpsToggleBtn = $('#fpsToggleBtn');
       const fpsDisplay = $('#fpsDisplay');
-      const modeNote = $('#modeNote');
-      let activeMode = null;
+      const supportsFullscreenAPI = Boolean(
+        canvasWrapper &&
+          (canvasWrapper.requestFullscreen ||
+            canvasWrapper.webkitRequestFullscreen ||
+            canvasWrapper.webkitRequestFullScreen ||
+            canvasWrapper.mozRequestFullScreen ||
+            canvasWrapper.msRequestFullscreen)
+      );
+      const playerControlsOverlay = document.getElementById('playerControlsOverlay');
+      let activeMode = 'local';
       let websocket = null;
       let websocketBuffers = null;
       let websocketRenderPayload = null;
@@ -524,7 +580,14 @@
       let lastFpsUpdateTime = 0;
       let controlsHideTimeout = null;
       let isOverlayHidden = false;
+      let usingFallbackFullscreen = false;
+      let fullscreenHandlersAttached = false;
+      let localPlaybackActive = false;
       const autoplayDetails = $('#autoplayDetails');
+      const modeNote = $('#modeNote');
+      const fileDropZone = document.getElementById('fileDropZone');
+      const fileDropInput = document.getElementById('fileDropInput');
+      const fileDropButton = document.getElementById('fileDropButton');
 
       function stopMicStream() {
         if (micGainNode) {
@@ -550,16 +613,10 @@
         }
         const canvasHeight = canvasWrapper.offsetHeight;
         if (canvasHeight > 0) {
-          presetSidebarEl.style.maxHeight = canvasHeight + 'px';
-          const header = presetSidebarEl.querySelector('h3');
           const toolbar = document.getElementById('presetToolbar');
-          let listMaxHeight = canvasHeight;
-          if (toolbar) {
-            listMaxHeight -= toolbar.offsetHeight;
-          }
-          if (header) {
-            listMaxHeight -= header.offsetHeight;
-          }
+          const header = presetSidebarEl.querySelector('h3');
+          const totalOffset = (toolbar ? toolbar.offsetHeight : 0) + (header ? header.offsetHeight : 0);
+          const listMaxHeight = canvasHeight - totalOffset;
           if (listMaxHeight > 0) {
             presetListElement.css('max-height', listMaxHeight + 'px');
           }
@@ -604,17 +661,56 @@
         syncPresetPanelHeight();
       }
 
+      function updateModeUI() {
+        const isLocalMode = activeMode === 'local';
+        const shouldShowCanvas = !isLocalMode || localPlaybackActive;
+
+        if (fileDropZone) {
+          fileDropZone.style.display = isLocalMode && !localPlaybackActive ? 'block' : 'none';
+        }
+
+        if (canvasWrapper) {
+          canvasWrapper.style.display = shouldShowCanvas ? 'block' : 'none';
+        }
+
+        if (playerControlsOverlay) {
+          playerControlsOverlay.style.display = shouldShowCanvas ? '' : 'none';
+        }
+
+        if (!shouldShowCanvas && isInFullscreen()) {
+          if (usingFallbackFullscreen) {
+            exitFallbackFullscreen();
+          } else {
+            const exit =
+              document.exitFullscreen ||
+              document.webkitExitFullscreen ||
+              document.mozCancelFullScreen ||
+              document.msExitFullscreen;
+            if (exit) {
+              try {
+                const result = exit.call(document);
+                if (result && typeof result.catch === 'function') {
+                  result.catch(() => {});
+                }
+              } catch (err) {
+                console.warn('No se pudo salir del modo pantalla completa', err);
+              }
+            }
+          }
+        }
+
+        syncPresetPanelHeight();
+      }
+
       function updateFullscreenButton() {
-        if (document.fullscreenElement) {
+        if (isInFullscreen()) {
           fullscreenBtn.text('⤡');
           fullscreenBtn.attr('aria-label', 'Salir de pantalla completa');
           fullscreenBtn.attr('title', 'Salir de pantalla completa');
-          enableFullscreenHideBehaviour();
         } else {
           fullscreenBtn.text('⛶');
           fullscreenBtn.attr('aria-label', 'Pantalla completa');
           fullscreenBtn.attr('title', 'Pantalla completa');
-          disableFullscreenHideBehaviour();
         }
       }
 
@@ -699,7 +795,7 @@
         }
         if (mode === 'local') {
           return (
-            '<strong>Archivos locales:</strong> Carga archivos de audio desde tu equipo para reproducirlos en el visualizador.'
+            '<strong>Archivos locales:</strong> Arrastra y suelta tus archivos de audio o selecciónalos manualmente. El visualizador aparecerá cuando empiece la reproducción.'
           );
         }
         return '';
@@ -724,6 +820,11 @@
         if (previous === 'mic' && mode !== 'mic') {
           stopMicStream();
         }
+        if (mode === 'local') {
+          localPlaybackActive = mode === previous ? localPlaybackActive : false;
+        } else {
+          localPlaybackActive = true;
+        }
         syncPresetPanelHeight();
         const noteContent = getModeNoteContent(mode);
         if (noteContent) {
@@ -732,6 +833,7 @@
         } else {
           modeNote.css('display', 'none');
         }
+        updateModeUI();
       }
 
       function clearWebsocketPayload() {
@@ -742,10 +844,7 @@
         const aspectRatio = 16 / 9;
         const fallbackWidth = 960;
 
-        const isFullscreen =
-          document.fullscreenElement &&
-          (document.fullscreenElement === canvasWrapper ||
-            document.fullscreenElement.contains(canvasWrapper));
+        const isFullscreen = isInFullscreen();
 
         let availableWidth = fallbackWidth;
         let viewportHeight = window.innerHeight ? window.innerHeight * 0.7 : fallbackWidth / aspectRatio;
@@ -826,11 +925,38 @@
       }
 
       function isInFullscreen() {
+        if (usingFallbackFullscreen) {
+          return true;
+        }
         return (
           document.fullscreenElement &&
           (document.fullscreenElement === canvasWrapper ||
             document.fullscreenElement.contains(canvasWrapper))
         );
+      }
+
+      function enterFallbackFullscreen() {
+        if (!canvasWrapper) {
+          return;
+        }
+        usingFallbackFullscreen = true;
+        document.body.classList.add('fullscreen-fallback-active');
+        canvasWrapper.classList.add('fullscreen-fallback');
+        updateFullscreenButton();
+        enableFullscreenHideBehaviour();
+        resizeVisualizer();
+      }
+
+      function exitFallbackFullscreen() {
+        if (!canvasWrapper) {
+          return;
+        }
+        usingFallbackFullscreen = false;
+        document.body.classList.remove('fullscreen-fallback-active');
+        canvasWrapper.classList.remove('fullscreen-fallback');
+        disableFullscreenHideBehaviour();
+        resizeVisualizer();
+        updateFullscreenButton();
       }
 
       function updateOverlayVisibility() {
@@ -884,11 +1010,14 @@
         if (!canvasWrapper) {
           return;
         }
-        canvasWrapper.addEventListener('mousemove', handleFullscreenInteraction);
-        canvasWrapper.addEventListener('mousedown', handleFullscreenInteraction);
-        canvasWrapper.addEventListener('touchstart', handleFullscreenInteraction, {
-          passive: true,
-        });
+        if (!fullscreenHandlersAttached) {
+          canvasWrapper.addEventListener('mousemove', handleFullscreenInteraction);
+          canvasWrapper.addEventListener('mousedown', handleFullscreenInteraction);
+          canvasWrapper.addEventListener('touchstart', handleFullscreenInteraction, {
+            passive: true,
+          });
+          fullscreenHandlersAttached = true;
+        }
         showControlsOverlay();
       }
 
@@ -896,9 +1025,12 @@
         if (!canvasWrapper) {
           return;
         }
-        canvasWrapper.removeEventListener('mousemove', handleFullscreenInteraction);
-        canvasWrapper.removeEventListener('mousedown', handleFullscreenInteraction);
-        canvasWrapper.removeEventListener('touchstart', handleFullscreenInteraction);
+        if (fullscreenHandlersAttached) {
+          canvasWrapper.removeEventListener('mousemove', handleFullscreenInteraction);
+          canvasWrapper.removeEventListener('mousedown', handleFullscreenInteraction);
+          canvasWrapper.removeEventListener('touchstart', handleFullscreenInteraction);
+          fullscreenHandlersAttached = false;
+        }
         cancelControlsHideTimer();
         isOverlayHidden = false;
         updateOverlayVisibility();
@@ -1171,14 +1303,23 @@
 
         startRenderer();
         sourceNode.start(0);
+        if (activeMode === 'local') {
+          localPlaybackActive = true;
+          updateModeUI();
+        }
       }
 
       function loadLocalFiles(files, index = 0) {
         if (!files || !files.length) {
           return;
         }
-        setActiveMode('local');
+        if (activeMode !== 'local') {
+          setActiveMode('local');
+        }
+        clearWebsocketPayload();
         resumeContextIfNeeded();
+        localPlaybackActive = true;
+        updateModeUI();
 
         const reader = new FileReader();
         reader.onload = (event) => {
@@ -1188,13 +1329,17 @@
             window.setTimeout(() => {
               if (files.length > index + 1) {
                 loadLocalFiles(files, index + 1);
-              } else if (sourceNode) {
-                try {
-                  sourceNode.disconnect();
-                } catch (err) {
-                  console.warn('Error al detener la reproducción local', err);
+              } else {
+                if (sourceNode) {
+                  try {
+                    sourceNode.disconnect();
+                  } catch (err) {
+                    console.warn('Error al detener la reproducción local', err);
+                  }
+                  sourceNode = null;
                 }
-                sourceNode = null;
+                localPlaybackActive = false;
+                updateModeUI();
               }
             }, decodedBuffer.duration * 1000);
           });
@@ -1441,7 +1586,11 @@
 
       $('#modeLocal').click(() => {
         setActiveMode('local');
-        localFileInput.click();
+        if (fileDropInput) {
+          fileDropInput.click();
+        } else if (localFileInput) {
+          localFileInput.click();
+        }
       });
 
       $('#modeMic').click(() => {
@@ -1492,7 +1641,12 @@
       });
 
       fullscreenBtn.on('click', () => {
-        if (document.fullscreenElement) {
+        if (isInFullscreen()) {
+          if (usingFallbackFullscreen || !supportsFullscreenAPI) {
+            exitFallbackFullscreen();
+            return;
+          }
+
           const exit =
             document.exitFullscreen ||
             document.webkitExitFullscreen ||
@@ -1510,12 +1664,16 @@
               console.warn('No se pudo salir del modo pantalla completa', err);
             }
           }
-        } else {
-        const request =
-          canvasWrapper.requestFullscreen ||
-          canvasWrapper.webkitRequestFullscreen ||
-          canvasWrapper.mozRequestFullScreen ||
-          canvasWrapper.msRequestFullscreen;
+          return;
+        }
+
+        if (supportsFullscreenAPI) {
+          const request =
+            canvasWrapper.requestFullscreen ||
+            canvasWrapper.webkitRequestFullscreen ||
+            canvasWrapper.webkitRequestFullScreen ||
+            canvasWrapper.mozRequestFullScreen ||
+            canvasWrapper.msRequestFullscreen;
           if (request) {
             try {
               const result = request.call(canvasWrapper);
@@ -1526,10 +1684,13 @@
               }
             } catch (err) {
               console.warn('No se pudo activar la pantalla completa', err);
+              enterFallbackFullscreen();
             }
           } else {
-            console.warn('Pantalla completa no soportada en este navegador');
+            enterFallbackFullscreen();
           }
+        } else {
+          enterFallbackFullscreen();
         }
       });
 
@@ -1552,6 +1713,11 @@
       ];
       fullscreenEvents.forEach((eventName) => {
         document.addEventListener(eventName, () => {
+          if (isInFullscreen()) {
+            enableFullscreenHideBehaviour();
+          } else {
+            disableFullscreenHideBehaviour();
+          }
           updateFullscreenButton();
           window.requestAnimationFrame(resizeVisualizer);
         });
@@ -1561,14 +1727,59 @@
         window.requestAnimationFrame(resizeVisualizer);
       });
 
-      localFileInput.addEventListener('change', (event) => {
-        const { files } = event.target;
-        if (files && files.length) {
-          clearWebsocketPayload();
-          loadLocalFiles(files);
-        }
-        localFileInput.value = '';
+      window.addEventListener('orientationchange', () => {
+        setTimeout(() => {
+          resizeVisualizer();
+          showControlsOverlay();
+        }, 250);
       });
+
+      function handleLocalFileSelection(fileList) {
+        if (fileList && fileList.length) {
+          loadLocalFiles(fileList);
+        }
+      }
+
+      if (fileDropButton && fileDropInput) {
+        fileDropButton.addEventListener('click', () => fileDropInput.click());
+        fileDropInput.addEventListener('change', (event) => {
+          handleLocalFileSelection(event.target.files);
+          event.target.value = '';
+        });
+      }
+
+      if (fileDropZone) {
+        ['dragenter', 'dragover'].forEach((eventName) => {
+          fileDropZone.addEventListener(eventName, (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            fileDropZone.classList.add('dragover');
+          });
+        });
+
+        ['dragleave', 'dragend'].forEach((eventName) => {
+          fileDropZone.addEventListener(eventName, (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            fileDropZone.classList.remove('dragover');
+          });
+        });
+
+        fileDropZone.addEventListener('drop', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          fileDropZone.classList.remove('dragover');
+          const { files } = event.dataTransfer || {};
+          handleLocalFileSelection(files);
+        });
+      }
+
+      if (localFileInput) {
+        localFileInput.addEventListener('change', (event) => {
+          handleLocalFileSelection(event.target.files);
+          localFileInput.value = '';
+        });
+      }
 
       $('#presetList').on('click', '.preset-item', function() {
         const index = parseInt($(this).attr('data-index'), 10);
@@ -1632,13 +1843,14 @@
       });
 
       initPlayer();
-      setActiveMode('mic');
+      setActiveMode('local');
       updateWebsocketStatus('Introduce la IP o dominio y puerto del servidor WebSocket');
       updatePlayPauseButton();
       updateFullscreenButton();
       updateFpsVisibility();
       updateAutoplayUI();
       resizeVisualizer();
+      updateModeUI();
 
       window.__butterchurnDemo = {
         getPresetKeys: () => presetKeys.slice(),
@@ -1682,6 +1894,11 @@
     <div id="content">
       <main id="playerArea">
         <div id="modeNote" class="mode-note"></div>
+        <div id="fileDropZone" style="display:none;">
+          <p>Arrastra y suelta archivos de audio aquí o selecciónalos manualmente.</p>
+          <button type="button" id="fileDropButton">Elegir archivos</button>
+          <input type="file" id="fileDropInput" accept="audio/*" multiple />
+        </div>
         <div id="canvasWrapper">
             <canvas id="canvas" width="960" height="540"></canvas>
             <div id="playerControlsOverlay">
