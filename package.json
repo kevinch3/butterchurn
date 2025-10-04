@@ -20,11 +20,14 @@
     "test:visual:update": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --config jest.config.mjs test/visual/regression.test.js --updateSnapshot",
     "test:visual:watch": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --config jest.config.mjs test/visual/regression.test.js --watch",
     "test:visual:local": "yarn build && yarn test:visual",
-    "test:visual:view": "open test/visual/__image_snapshots__/__diff_output__"
+    "test:visual:view": "open test/visual/__image_snapshots__/__diff_output__",
+    "demo:prepare": "node scripts/prepare-demo-assets.js",
+    "demo:serve": "npm run demo:prepare && npx http-server . -c-1",
+    "deploy:demo": "npm run demo:prepare && gh-pages -d examples"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jberg/butterchurn.git"
+    "url": "git+https://github.com/kevinch3/butterchurn.git"
   },
   "keywords": [
     "music visualization",
@@ -34,29 +37,32 @@
   ],
   "author": "Jordan Berg <jordannealberg@gmail.com>",
   "license": "MIT",
-  "homepage": "https://butterchurnviz.com",
+  "homepage": "https://kevinch3.github.io/butterchurn",
   "dependencies": {
     "@assemblyscript/loader": "^0.17.11",
     "ecma-proposal-math-extensions": "0.0.2",
-    "eel-wasm": "^0.0.16"
+    "eel-wasm": "^0.0.16",
+    "jquery": "^3.7.1"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.6",
     "@rollup/plugin-node-resolve": "^16.0.1",
     "@rollup/plugin-terser": "^0.4.4",
     "@rollup/pluginutils": "^5.2.0",
-    "@types/jest": "^30.0.0",
+    "@types/jest": "^29.5.12",
     "assemblyscript": "^0.17.11",
     "butterchurn-presets": "3.0.0-beta.4",
     "butterchurn-presets-js": "npm:butterchurn-presets@^2.4.7",
     "eslint": "^7.9.0",
     "eslint-plugin-prettier": "^3.1.4",
-    "jest": "^30.0.4",
+    "jest": "^29.7.0",
     "jest-image-snapshot": "^6.5.1",
     "prettier": "^2.1.2",
     "puppeteer": "^24.12.1",
     "rollup": "^4.44.2",
-    "rollup-plugin-copy": "^3.5.0"
+    "rollup-plugin-copy": "^3.5.0",
+    "normalize.css": "^8.0.1",
+    "gh-pages": "^6.1.1"
   },
   "browserslist": "supports audio-api and supports webgl2 and last 3 years",
   "packageManager": "pnpm@10.6.5+sha1.da220e966c2db3275efb5928cf8f3592681b106b"

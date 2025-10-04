@@ -52,6 +52,62 @@ visualizer.setRendererSize(1600, 1200);
 visualizer.render();
 ```
 
+## Local browser demo
+
+The repository includes a rich demo (`examples/demo.html`) that now runs entirely from local assets and showcases the three input modes:
+
+* **Micrófono** *(modo predeterminado)* &mdash; solicita permiso al usuario y reproduce el audio del micrófono en tiempo real.
+* **Archivo** &mdash; permite cargar uno o varios archivos locales.
+* **WebSocket** &mdash; consume datos parametrizados enviados por sensores o dispositivos IoT.
+
+### Ejecutar el demo localmente
+
+```bash
+npm install
+npm run build        # recompila butterchurn y genera dist/butterchurn.js
+npm run demo:prepare   # copia los assets necesarios a examples/vendor
+npm run demo:serve     # sirve el proyecto en http://localhost:8080
+```
+
+Luego abre `http://localhost:8080/examples/demo.html`.
+
+Notas destacadas:
+
+* La reproducción inicia en pausa, el modo autorreproducción está desactivado por defecto y solo se habilita cuando el visualizador está corriendo.
+* En pantalla completa la botonera desaparece automáticamente tras un segundo de inactividad y vuelve a mostrarse al mover el cursor o tocar la pantalla.
+* Cada modo muestra una nota contextual con instrucciones (permiso de micrófono, formato de payload WebSocket, etc.).
+
+### WebSocket: formato esperado
+
+Activa **WebSocket**, introduce la IP/host y el puerto del servidor y pulsa **Conectar**. Cada mensaje debe ser JSON y puede incluir:
+
+* Arrays de muestras (`timeDomain`, `timeDomainL`, `timeDomainR`, `samples`, `samplesL`, `samplesR`, `left`, `right`) en `0-255` o `-1.0` a `1.0`.
+* Overrides por banda (`levels.bass`, `levels.mid`, `levels.treb` y sus variantes `_att`).
+* `elapsedTime` opcional para animaciones dependientes de tiempo.
+
+Ejemplo mínimo:
+
+```json
+{
+  "levels": { "bass": 1.2, "mid": 0.9 },
+  "samplesL": [128, 140, 137, 132],
+  "samplesR": [128, 135, 139, 131]
+}
+```
+
+Si no se envían muestras, el demo sintetiza una forma de onda a partir de los niveles.
+
+Un mock basado en ESP32 con micrófono que publica este tipo de mensajes puede encontrarse en [github.com/espressif/esp-box](https://github.com/espressif/esp-box/tree/master/examples/voice_recognition).
+
+### Publicar en GitHub Pages
+
+1. `npm install`
+2. `npm run build`
+3. `npm run demo:prepare`
+4. `npm run deploy:demo`
+
+El script publica el contenido de `examples/` (incluyendo los assets locales generados) en la rama `gh-pages`, quedando disponible en `https://<tu-usuario>.github.io/butterchurn/examples/demo.html`.
+
 ### Browser Support
 
 Butterchurn requires the [browser support WebGL 2](https://caniuse.com/#feat=webgl2).
