@@ -67,6 +67,7 @@ npm install
 npm run build        # recompila butterchurn y genera dist/butterchurn.js
 npm run demo:prepare   # copia los assets necesarios a examples/vendor
 npm run demo:serve     # sirve el proyecto en http://localhost:8080
+npm run demo:thumbnails # genera miniaturas GIF de 120x68 para cada preset
 ```
 
 Luego abre `http://localhost:8080/examples/demo.html`.
@@ -104,7 +105,8 @@ Un mock basado en ESP32 con micrófono que publica este tipo de mensajes puede e
 1. `npm install`
 2. `npm run build`
 3. `npm run demo:prepare`
-4. `npm run deploy:demo`
+4. `npm run demo:thumbnails`
+5. `npm run deploy:demo`
 
 El script publica el contenido de `examples/` (incluyendo los assets locales generados) en la rama `gh-pages`, quedando disponible en `https://<tu-usuario>.github.io/butterchurn/examples/demo.html`.
 

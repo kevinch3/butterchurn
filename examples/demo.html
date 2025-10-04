@@ -1287,33 +1287,91 @@
         }
       }
 
+      function getFileSafePresetName(name) {
+        return name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '');
+      }
+
+      async function fetchThumbnail(fileSafeName) {
+        const fileName = `${fileSafeName || 'preset'}.gif`;
+        const localPath = `./thumbnails/${fileName}`;
+        try {
+          const response = await fetch(localPath, {
+            method: 'HEAD',
+            cache: 'no-cache',
+          });
+          if (response.ok) {
+            return localPath;
+          }
+        } catch (err) {
+          // ignore and fallback to placeholder
+        }
+        return null;
+      }
+
       function renderPresetRecommendations() {
         presetListElement.empty();
-        for (let i = 0; i < presetKeys.length; i += 1) {
-          const key = presetKeys[i];
+
+        const fragment = document.createDocumentFragment();
+        const tasks = presetKeys.map((key, i) => {
           const parts = key.split(' - ');
           const titleText = parts[0] ? parts[0].trim() : key;
           const authorText = parts.length > 1 ? parts.slice(1).join(' - ').trim() : 'Preset recomendado';
+          const fileSafe = getFileSafePresetName(key);
 
-          const item = $('<li class="preset-item" data-index="' + i + '"></li>');
-          const thumb = $('<div class="preset-thumbnail"></div>').text(String(i + 1).padStart(2, '0'));
-          const meta = $('<div class="preset-meta"></div>');
-          meta.append($('<div class="preset-title"></div>').text(titleText));
-          meta.append($('<div class="preset-info"></div>').text(authorText));
+          return fetchThumbnail(fileSafe).then((thumbnailSrc) => {
+            const li = document.createElement('li');
+            li.className = 'preset-item';
+            li.setAttribute('data-index', String(i));
 
-          item.append(thumb, meta);
-          item.on('click', () => {
-            if (i === presetIndex) {
-              visualizer.loadPreset(presets[presetKeys[presetIndex]], 0);
-              return;
+            const thumb = document.createElement('div');
+            thumb.className = 'preset-thumbnail';
+            if (thumbnailSrc) {
+              const img = document.createElement('img');
+              img.src = thumbnailSrc;
+              img.alt = `Miniatura de ${titleText}`;
+              img.loading = 'lazy';
+              thumb.appendChild(img);
+            } else {
+              thumb.textContent = String(i + 1).padStart(2, '0');
             }
-            loadPresetFromList(i, 2.0);
-          });
 
-          presetListElement.append(item);
-        }
-        highlightPreset(presetIndex);
-        syncPresetPanelHeight();
+            const meta = document.createElement('div');
+            meta.className = 'preset-meta';
+
+            const title = document.createElement('div');
+            title.className = 'preset-title';
+            title.textContent = titleText;
+
+            const info = document.createElement('div');
+            info.className = 'preset-info';
+            info.textContent = authorText;
+
+            meta.appendChild(title);
+            meta.appendChild(info);
+
+            li.appendChild(thumb);
+            li.appendChild(meta);
+
+            li.addEventListener('click', () => {
+              if (i === presetIndex) {
+                visualizer.loadPreset(presets[presetKeys[presetIndex]], 0);
+                return;
+              }
+              loadPresetFromList(i, 2.0);
+            });
+
+            fragment.appendChild(li);
+          });
+        });
+
+        Promise.all(tasks).then(() => {
+          presetListElement[0].appendChild(fragment);
+          highlightPreset(presetIndex);
+          syncPresetPanelHeight();
+        });
       }
 
       function initPlayer() {
@@ -1581,6 +1639,29 @@
       updateFpsVisibility();
       updateAutoplayUI();
       resizeVisualizer();
+
+      window.__butterchurnDemo = {
+        getPresetKeys: () => presetKeys.slice(),
+        loadPreset: (name, { blendTime = 0 } = {}) => {
+          const idx = presetKeys.indexOf(name);
+          if (idx === -1) {
+            return false;
+          }
+          loadPresetFromList(idx, blendTime, false);
+          return true;
+        },
+        resume: () => {
+          resumePlayback();
+        },
+        pause: () => {
+          pausePlayback();
+        },
+        captureFrame: () => {
+          return canvas.toDataURL('image/png');
+        },
+        getCanvasSize: () => ({ width: canvas.width, height: canvas.height }),
+      };
+      window.__butterchurnDemoReady = true;
     });
   </script>
 </head>

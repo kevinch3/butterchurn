@@ -23,6 +23,7 @@
     "test:visual:view": "open test/visual/__image_snapshots__/__diff_output__",
     "demo:prepare": "node scripts/prepare-demo-assets.js",
     "demo:serve": "npm run demo:prepare && npx http-server . -c-1",
+    "demo:thumbnails": "npm run demo:prepare && node scripts/generate-preset-thumbnails.js",
     "deploy:demo": "npm run demo:prepare && gh-pages -d examples"
   },
   "repository": {
@@ -62,7 +63,8 @@
     "rollup": "^4.44.2",
     "rollup-plugin-copy": "^3.5.0",
     "normalize.css": "^8.0.1",
-    "gh-pages": "^6.1.1"
+    "gh-pages": "^6.1.1",
+    "sharp": "^0.33.4"
   },
   "browserslist": "supports audio-api and supports webgl2 and last 3 years",
   "packageManager": "pnpm@10.6.5+sha1.da220e966c2db3275efb5928cf8f3592681b106b"
