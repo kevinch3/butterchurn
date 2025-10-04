@@ -23,6 +23,10 @@
       color: #f1f1f1;
     }
 
+    body.fullscreen-fallback-active {
+      overflow: hidden;
+    }
+
     #app {
       min-height: 100vh;
       display: flex;
@@ -225,6 +229,18 @@
       box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
       width: 100%;
       max-width: 100%;
+    }
+
+    #canvasWrapper.fullscreen-fallback {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      max-width: unset;
+      border-radius: 0;
+      box-shadow: none;
+      z-index: 999;
+      background: #000;
     }
 
     #canvas {
@@ -451,12 +467,7 @@
         max-width: none;
         border-left: none;
         border-top: 1px solid #272727;
-        max-height: 320px;
         box-shadow: none;
-      }
-
-      #presetList {
-        max-height: 320px;
       }
     }
 
@@ -510,6 +521,14 @@
       const fpsToggleBtn = $('#fpsToggleBtn');
       const fpsDisplay = $('#fpsDisplay');
       const modeNote = $('#modeNote');
+      const supportsFullscreenAPI = Boolean(
+        canvasWrapper &&
+          (canvasWrapper.requestFullscreen ||
+            canvasWrapper.webkitRequestFullscreen ||
+            canvasWrapper.webkitRequestFullScreen ||
+            canvasWrapper.mozRequestFullScreen ||
+            canvasWrapper.msRequestFullscreen)
+      );
       let activeMode = null;
       let websocket = null;
       let websocketBuffers = null;
@@ -524,6 +543,8 @@
       let lastFpsUpdateTime = 0;
       let controlsHideTimeout = null;
       let isOverlayHidden = false;
+      let usingFallbackFullscreen = false;
+      let fullscreenHandlersAttached = false;
       const autoplayDetails = $('#autoplayDetails');
 
       function stopMicStream() {
@@ -550,16 +571,10 @@
         }
         const canvasHeight = canvasWrapper.offsetHeight;
         if (canvasHeight > 0) {
-          presetSidebarEl.style.maxHeight = canvasHeight + 'px';
-          const header = presetSidebarEl.querySelector('h3');
           const toolbar = document.getElementById('presetToolbar');
-          let listMaxHeight = canvasHeight;
-          if (toolbar) {
-            listMaxHeight -= toolbar.offsetHeight;
-          }
-          if (header) {
-            listMaxHeight -= header.offsetHeight;
-          }
+          const header = presetSidebarEl.querySelector('h3');
+          const totalOffset = (toolbar ? toolbar.offsetHeight : 0) + (header ? header.offsetHeight : 0);
+          const listMaxHeight = canvasHeight - totalOffset;
           if (listMaxHeight > 0) {
             presetListElement.css('max-height', listMaxHeight + 'px');
           }
@@ -605,16 +620,14 @@
       }
 
       function updateFullscreenButton() {
-        if (document.fullscreenElement) {
+        if (isInFullscreen()) {
           fullscreenBtn.text('⤡');
           fullscreenBtn.attr('aria-label', 'Salir de pantalla completa');
           fullscreenBtn.attr('title', 'Salir de pantalla completa');
-          enableFullscreenHideBehaviour();
         } else {
           fullscreenBtn.text('⛶');
           fullscreenBtn.attr('aria-label', 'Pantalla completa');
           fullscreenBtn.attr('title', 'Pantalla completa');
-          disableFullscreenHideBehaviour();
         }
       }
 
@@ -742,10 +755,7 @@
         const aspectRatio = 16 / 9;
         const fallbackWidth = 960;
 
-        const isFullscreen =
-          document.fullscreenElement &&
-          (document.fullscreenElement === canvasWrapper ||
-            document.fullscreenElement.contains(canvasWrapper));
+        const isFullscreen = isInFullscreen();
 
         let availableWidth = fallbackWidth;
         let viewportHeight = window.innerHeight ? window.innerHeight * 0.7 : fallbackWidth / aspectRatio;
@@ -826,11 +836,38 @@
       }
 
       function isInFullscreen() {
+        if (usingFallbackFullscreen) {
+          return true;
+        }
         return (
           document.fullscreenElement &&
           (document.fullscreenElement === canvasWrapper ||
             document.fullscreenElement.contains(canvasWrapper))
         );
+      }
+
+      function enterFallbackFullscreen() {
+        if (!canvasWrapper) {
+          return;
+        }
+        usingFallbackFullscreen = true;
+        document.body.classList.add('fullscreen-fallback-active');
+        canvasWrapper.classList.add('fullscreen-fallback');
+        updateFullscreenButton();
+        enableFullscreenHideBehaviour();
+        resizeVisualizer();
+      }
+
+      function exitFallbackFullscreen() {
+        if (!canvasWrapper) {
+          return;
+        }
+        usingFallbackFullscreen = false;
+        document.body.classList.remove('fullscreen-fallback-active');
+        canvasWrapper.classList.remove('fullscreen-fallback');
+        disableFullscreenHideBehaviour();
+        resizeVisualizer();
+        updateFullscreenButton();
       }
 
       function updateOverlayVisibility() {
@@ -884,11 +921,14 @@
         if (!canvasWrapper) {
           return;
         }
-        canvasWrapper.addEventListener('mousemove', handleFullscreenInteraction);
-        canvasWrapper.addEventListener('mousedown', handleFullscreenInteraction);
-        canvasWrapper.addEventListener('touchstart', handleFullscreenInteraction, {
-          passive: true,
-        });
+        if (!fullscreenHandlersAttached) {
+          canvasWrapper.addEventListener('mousemove', handleFullscreenInteraction);
+          canvasWrapper.addEventListener('mousedown', handleFullscreenInteraction);
+          canvasWrapper.addEventListener('touchstart', handleFullscreenInteraction, {
+            passive: true,
+          });
+          fullscreenHandlersAttached = true;
+        }
         showControlsOverlay();
       }
 
@@ -896,9 +936,12 @@
         if (!canvasWrapper) {
           return;
         }
-        canvasWrapper.removeEventListener('mousemove', handleFullscreenInteraction);
-        canvasWrapper.removeEventListener('mousedown', handleFullscreenInteraction);
-        canvasWrapper.removeEventListener('touchstart', handleFullscreenInteraction);
+        if (fullscreenHandlersAttached) {
+          canvasWrapper.removeEventListener('mousemove', handleFullscreenInteraction);
+          canvasWrapper.removeEventListener('mousedown', handleFullscreenInteraction);
+          canvasWrapper.removeEventListener('touchstart', handleFullscreenInteraction);
+          fullscreenHandlersAttached = false;
+        }
         cancelControlsHideTimer();
         isOverlayHidden = false;
         updateOverlayVisibility();
@@ -1492,7 +1535,12 @@
       });
 
       fullscreenBtn.on('click', () => {
-        if (document.fullscreenElement) {
+        if (isInFullscreen()) {
+          if (usingFallbackFullscreen || !supportsFullscreenAPI) {
+            exitFallbackFullscreen();
+            return;
+          }
+
           const exit =
             document.exitFullscreen ||
             document.webkitExitFullscreen ||
@@ -1510,12 +1558,16 @@
               console.warn('No se pudo salir del modo pantalla completa', err);
             }
           }
-        } else {
-        const request =
-          canvasWrapper.requestFullscreen ||
-          canvasWrapper.webkitRequestFullscreen ||
-          canvasWrapper.mozRequestFullScreen ||
-          canvasWrapper.msRequestFullscreen;
+          return;
+        }
+
+        if (supportsFullscreenAPI) {
+          const request =
+            canvasWrapper.requestFullscreen ||
+            canvasWrapper.webkitRequestFullscreen ||
+            canvasWrapper.webkitRequestFullScreen ||
+            canvasWrapper.mozRequestFullScreen ||
+            canvasWrapper.msRequestFullscreen;
           if (request) {
             try {
               const result = request.call(canvasWrapper);
@@ -1526,10 +1578,13 @@
               }
             } catch (err) {
               console.warn('No se pudo activar la pantalla completa', err);
+              enterFallbackFullscreen();
             }
           } else {
-            console.warn('Pantalla completa no soportada en este navegador');
+            enterFallbackFullscreen();
           }
+        } else {
+          enterFallbackFullscreen();
         }
       });
 
@@ -1552,6 +1607,11 @@
       ];
       fullscreenEvents.forEach((eventName) => {
         document.addEventListener(eventName, () => {
+          if (isInFullscreen()) {
+            enableFullscreenHideBehaviour();
+          } else {
+            disableFullscreenHideBehaviour();
+          }
           updateFullscreenButton();
           window.requestAnimationFrame(resizeVisualizer);
         });
@@ -1559,6 +1619,13 @@
 
       $(window).on('resize', () => {
         window.requestAnimationFrame(resizeVisualizer);
+      });
+
+      window.addEventListener('orientationchange', () => {
+        setTimeout(() => {
+          resizeVisualizer();
+          showControlsOverlay();
+        }, 250);
       });
 
       localFileInput.addEventListener('change', (event) => {
