@@ -822,7 +822,7 @@ export default class Renderer {
     );
   }
 
-  render({ audioLevels, elapsedTime } = {}) {
+  render({ audioLevels, sensorLevels, elapsedTime } = {}) {
     this.calcTimeAndFPS(elapsedTime);
     this.frameNum += 1;
 
@@ -836,6 +836,10 @@ export default class Renderer {
       this.audio.sampleAudio();
     }
     this.audioLevels.updateAudioLevels(this.fps, this.frameNum);
+
+    if (sensorLevels) {
+      this.applySensorLevelOverrides(sensorLevels);
+    }
 
     const globalVars = {
       frame: this.frameNum,
@@ -1104,6 +1108,30 @@ export default class Renderer {
     this.mdVSFrameMixed = mdVSFrameMixed;
 
     this.renderToScreen();
+  }
+
+  applySensorLevelOverrides(sensorLevels) {
+    const { bass, bass_att, mid, mid_att, treb, treb_att } = sensorLevels;
+    const { val, att } = this.audioLevels;
+
+    if (Number.isFinite(bass)) {
+      val[0] = bass;
+    }
+    if (Number.isFinite(bass_att)) {
+      att[0] = bass_att;
+    }
+    if (Number.isFinite(mid)) {
+      val[1] = mid;
+    }
+    if (Number.isFinite(mid_att)) {
+      att[1] = mid_att;
+    }
+    if (Number.isFinite(treb)) {
+      val[2] = treb;
+    }
+    if (Number.isFinite(treb_att)) {
+      att[2] = treb_att;
+    }
   }
 
   renderToScreen() {
