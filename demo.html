@@ -1,0 +1,1767 @@
+<!DOCTYPE html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Butterchurn Demo</title>
+  <meta name="description" content="Butterchurn Demo Example">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <script type="text/javascript" src="./vendor/jquery.min.js"></script>
+  <script type="text/javascript" src="./vendor/lodash.min.js"></script>
+  <script type="text/javascript" src="./vendor/butterchurn-presets-base.min.js"></script>
+  <script type="text/javascript" src="./vendor/butterchurn-presets-extra.min.js"></script>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: 'Inter', 'Roboto', 'Segoe UI', sans-serif;
+    }
+
+    body {
+      margin: 0;
+      background: #0f0f0f;
+      color: #f1f1f1;
+    }
+
+    #app {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #layout {
+      width: 100%;
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      padding: 0 16px 32px;
+      box-sizing: border-box;
+      gap: 20px;
+    }
+
+    #modeBar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 24px;
+      background: #181818;
+      border-bottom: 1px solid #272727;
+      flex-wrap: wrap;
+      border-radius: 16px;
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    .mode-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: #ff4d4d;
+    }
+
+    .mode-buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .mode-button {
+      border: 1px solid transparent;
+      background: #202020;
+      color: #f1f1f1;
+      border-radius: 999px;
+      padding: 8px 18px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.2s ease, border 0.2s ease;
+    }
+
+    .mode-button:hover {
+      background: #2b2b2b;
+    }
+
+    .mode-button.active {
+      background: #cc0000;
+      border-color: #ff4d4d;
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(204, 0, 0, 0.35);
+    }
+
+    #playerControlsOverlay {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 14px;
+      background: rgba(15, 15, 15, 0.65);
+      border-radius: 999px;
+      gap: 12px;
+      pointer-events: none;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(12px);
+      opacity: 1;
+      transition: opacity 0.2s ease;
+    }
+
+    #playerControlsOverlay.hidden {
+      opacity: 0;
+    }
+
+    .player-control-button {
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      background: rgba(32, 32, 32, 0.9);
+      color: #fff;
+      border-radius: 999px;
+      padding: 10px 18px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 48px;
+      min-height: 48px;
+      pointer-events: auto;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border 0.2s ease;
+    }
+
+    .player-control-button:hover {
+      transform: scale(1.04);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    .player-control-button.secondary {
+      background: rgba(32, 32, 32, 0.75);
+      font-size: 14px;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 8px 14px;
+      letter-spacing: 0.4px;
+    }
+
+    .player-control-button.secondary.active {
+      border-color: rgba(255, 77, 77, 0.65);
+      color: #ffe1e1;
+      box-shadow: 0 10px 20px rgba(204, 0, 0, 0.3);
+    }
+
+    #playPauseBtn {
+      background: linear-gradient(135deg, rgba(204, 0, 0, 0.9), rgba(255, 77, 77, 0.9));
+      box-shadow: 0 12px 24px rgba(204, 0, 0, 0.4);
+    }
+
+    #playPauseBtn:hover {
+      box-shadow: 0 16px 26px rgba(204, 0, 0, 0.45);
+    }
+
+    #fpsDisplay {
+      display: none;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.45);
+      color: #f5f5f5;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.6px;
+      pointer-events: none;
+    }
+
+    #fpsDisplay.visible {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #content {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      gap: 20px;
+      align-items: flex-start;
+    }
+
+    #playerArea {
+      flex: 1;
+      padding: 0 0 0;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .mode-note {
+      font-size: 13px;
+      line-height: 1.4;
+      color: #cfcfcf;
+      background: rgba(32, 32, 32, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 12px 16px;
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+      display: none;
+    }
+
+    #canvasWrapper {
+      position: relative;
+      background: #000;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+      width: 100%;
+      max-width: 100%;
+    }
+
+    #canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    #wsPanel {
+      background: #181818;
+      border: 1px solid #272727;
+      border-radius: 16px;
+      padding: 18px;
+      display: none;
+      gap: 12px;
+    }
+
+    #wsPanel.visible {
+      display: flex;
+      flex-direction: column;
+    }
+
+    #wsPanel h2 {
+      margin: 0 0 12px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #f1f1f1;
+    }
+
+    .panel-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+    }
+
+    .panel-grid label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+      color: #b5b5b5;
+    }
+
+    .panel-grid input,
+    .panel-grid select {
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #333;
+      background: #101010;
+      color: #f1f1f1;
+    }
+
+    .panel-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .panel-actions button {
+      padding: 8px 20px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .panel-actions button#wsConnectBtn {
+      background: #cc0000;
+      color: #fff;
+      box-shadow: 0 6px 18px rgba(204, 0, 0, 0.35);
+    }
+
+    .panel-actions button.secondary {
+      background: #2a2a2a;
+      color: #f1f1f1;
+    }
+
+    #wsStatus {
+      font-size: 12px;
+      min-height: 18px;
+      color: #bcbcbc;
+      margin-top: 6px;
+    }
+
+    #wsStatus.success {
+      color: #2ecc71;
+    }
+
+    #wsStatus.error {
+      color: #ff6b6b;
+    }
+
+    #presetSidebar {
+      width: 320px;
+      max-width: 36%;
+      background: #151515;
+      border-left: 1px solid #272727;
+      display: flex;
+      flex-direction: column;
+      align-self: flex-start;
+      border-radius: 16px;
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+      overflow: hidden;
+    }
+
+    #presetToolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px 16px;
+      border-bottom: 1px solid #272727;
+      background: rgba(21, 21, 21, 0.85);
+    }
+
+    #presetToolbar label,
+    #presetToolbar #autoplayDetails label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #1f1f1f;
+      border: 1px solid #2f2f2f;
+      border-radius: 999px;
+      padding: 6px 10px;
+      color: #cfcfcf;
+      font-size: 12px;
+    }
+
+    #presetToolbar input[type="checkbox"] {
+      accent-color: #cc0000;
+    }
+
+    #presetToolbar input[type="number"] {
+      width: 64px;
+      padding: 4px 6px;
+      border-radius: 6px;
+      border: 1px solid #333;
+      background: #101010;
+      color: #fff;
+      font-size: 13px;
+    }
+
+    #autoplayDetails {
+      display: none;
+      gap: 8px;
+    }
+
+    #presetSidebar h3 {
+      margin: 18px 24px 12px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #f8f8f8;
+    }
+
+    #presetList {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .preset-item {
+      display: flex;
+      gap: 14px;
+      padding: 12px 24px;
+      cursor: pointer;
+      border-left: 3px solid transparent;
+      transition: background 0.2s ease, border 0.2s ease;
+    }
+
+    .preset-item:hover {
+      background: #1f1f1f;
+    }
+
+    .preset-item.active {
+      background: #242424;
+      border-left-color: #cc0000;
+    }
+
+    .preset-thumbnail {
+      width: 120px;
+      height: 68px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, rgba(255, 77, 77, 0.85), rgba(102, 0, 0, 0.9));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 20px;
+      color: rgba(255, 255, 255, 0.9);
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+    }
+
+    .preset-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      justify-content: center;
+    }
+
+    .preset-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #f1f1f1;
+      line-height: 1.3;
+    }
+
+    .preset-info {
+      font-size: 12px;
+      color: #a0a0a0;
+    }
+
+    @media (max-width: 1080px) {
+      #content {
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      #presetSidebar {
+        width: 100%;
+        max-width: none;
+        border-left: none;
+        border-top: 1px solid #272727;
+        max-height: 320px;
+        box-shadow: none;
+      }
+
+      #presetList {
+        max-height: 320px;
+      }
+    }
+
+    #canvas:-moz-full-screen {
+      width: 100%;
+      height: 100%;
+    }
+
+    #canvas:-webkit-full-screen {
+      width: 100%;
+      height: 100%;
+    }
+
+    #canvas:-ms-fullscreen {
+      width: 100%;
+      height: 100%;
+    }
+
+    #canvas:fullscreen {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+  <link rel="stylesheet" href="./vendor/normalize.css" />
+
+  <script type="module">
+    import butterchurn from './vendor/butterchurn.js';
+
+    $(function() {
+      let visualizer = null;
+      let rendering = false;
+      let audioContext = null;
+      let sourceNode = null;
+      let delayedAudible = null;
+      let cycleInterval = null;
+      let presets = {};
+      let presetKeys = [];
+      let presetIndexHist = [];
+      let presetIndex = 0;
+      let presetCycle = false;
+      let presetCycleLength = 15000;
+      let presetRandom = false;
+      const canvas = document.getElementById('canvas');
+      const canvasWrapper = document.getElementById('canvasWrapper');
+      const presetSidebarEl = document.getElementById('presetSidebar');
+      const localFileInput = document.getElementById('localFileInput');
+      const presetListElement = $('#presetList');
+      const $modeButtons = $('.mode-button');
+      const playPauseBtn = $('#playPauseBtn');
+      const fullscreenBtn = $('#fullscreenBtn');
+      const fpsToggleBtn = $('#fpsToggleBtn');
+      const fpsDisplay = $('#fpsDisplay');
+      const modeNote = $('#modeNote');
+      let activeMode = null;
+      let websocket = null;
+      let websocketBuffers = null;
+      let websocketRenderPayload = null;
+      let micStream = null;
+      let micGainNode = null;
+      let animationFrameId = null;
+      let isPaused = true;
+      let showFps = false;
+      let lastFrameTime = null;
+      let currentFps = 0;
+      let lastFpsUpdateTime = 0;
+      let controlsHideTimeout = null;
+      let isOverlayHidden = false;
+      const autoplayDetails = $('#autoplayDetails');
+
+      function stopMicStream() {
+        if (micGainNode) {
+          if (visualizer) {
+            visualizer.disconnectAudio(micGainNode);
+          }
+          try {
+            micGainNode.disconnect();
+          } catch (err) {
+            console.warn('Error al desconectar el nodo del micrófono', err);
+          }
+          micGainNode = null;
+        }
+        if (micStream) {
+          micStream.getTracks().forEach((track) => track.stop());
+          micStream = null;
+        }
+      }
+
+      function syncPresetPanelHeight() {
+        if (!canvasWrapper || !presetSidebarEl) {
+          return;
+        }
+        const canvasHeight = canvasWrapper.offsetHeight;
+        if (canvasHeight > 0) {
+          presetSidebarEl.style.maxHeight = canvasHeight + 'px';
+          const header = presetSidebarEl.querySelector('h3');
+          const toolbar = document.getElementById('presetToolbar');
+          let listMaxHeight = canvasHeight;
+          if (toolbar) {
+            listMaxHeight -= toolbar.offsetHeight;
+          }
+          if (header) {
+            listMaxHeight -= header.offsetHeight;
+          }
+          if (listMaxHeight > 0) {
+            presetListElement.css('max-height', listMaxHeight + 'px');
+          }
+        }
+      }
+
+      function updatePlayPauseButton() {
+        if (isPaused) {
+          playPauseBtn.text('⏵');
+          playPauseBtn.attr('aria-label', 'Reproducir visualización');
+          playPauseBtn.attr('title', 'Reproducir visualización');
+        } else {
+          playPauseBtn.text('⏸');
+          playPauseBtn.attr('aria-label', 'Pausar visualización');
+          playPauseBtn.attr('title', 'Pausar visualización');
+        }
+      }
+
+      function updateFpsVisibility() {
+        if (showFps) {
+          fpsToggleBtn.addClass('active');
+          fpsToggleBtn.attr('aria-pressed', 'true');
+          fpsDisplay.addClass('visible');
+          lastFpsUpdateTime = 0;
+          const displayValue = currentFps > 0 ? `${Math.round(currentFps)} FPS` : '--';
+          fpsDisplay.text(displayValue);
+        } else {
+          fpsToggleBtn.removeClass('active');
+          fpsToggleBtn.attr('aria-pressed', 'false');
+          fpsDisplay.removeClass('visible');
+          fpsDisplay.text('--');
+          lastFpsUpdateTime = 0;
+        }
+      }
+
+      function updateAutoplayUI() {
+        if (presetCycle) {
+          autoplayDetails.css('display', 'flex');
+        } else {
+          autoplayDetails.css('display', 'none');
+        }
+        syncPresetPanelHeight();
+      }
+
+      function updateFullscreenButton() {
+        if (document.fullscreenElement) {
+          fullscreenBtn.text('⤡');
+          fullscreenBtn.attr('aria-label', 'Salir de pantalla completa');
+          fullscreenBtn.attr('title', 'Salir de pantalla completa');
+          enableFullscreenHideBehaviour();
+        } else {
+          fullscreenBtn.text('⛶');
+          fullscreenBtn.attr('aria-label', 'Pantalla completa');
+          fullscreenBtn.attr('title', 'Pantalla completa');
+          disableFullscreenHideBehaviour();
+        }
+      }
+
+      function pausePlayback() {
+        if (isPaused) {
+          return;
+        }
+        isPaused = true;
+        rendering = false;
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = null;
+        }
+        if (audioContext && audioContext.state === 'running') {
+          audioContext.suspend().catch((err) => {
+            console.warn('No se pudo pausar el contexto de audio', err);
+          });
+        }
+        updatePlayPauseButton();
+        lastFrameTime = null;
+        currentFps = 0;
+        lastFpsUpdateTime = 0;
+        if (showFps) {
+          fpsDisplay.text('--');
+        }
+        restartCycleInterval();
+      }
+
+      function resumePlayback() {
+        if (!isPaused) {
+          return;
+        }
+        isPaused = false;
+        lastFrameTime = null;
+        currentFps = 0;
+        lastFpsUpdateTime = 0;
+        if (showFps) {
+          fpsDisplay.text('--');
+        }
+        const resumeContext = () => {
+          startRenderer();
+          updatePlayPauseButton();
+        };
+
+        if (audioContext && audioContext.state === 'suspended') {
+          audioContext
+            .resume()
+            .catch((err) => {
+              console.warn('No se pudo reanudar el contexto de audio', err);
+            })
+            .finally(resumeContext);
+        } else {
+          resumeContext();
+        }
+        restartCycleInterval();
+      }
+
+      function resumeContextIfNeeded() {
+        if (!audioContext || isPaused) {
+          return;
+        }
+        if (audioContext.state !== 'running') {
+          audioContext.resume().catch((err) => {
+            console.warn('No se pudo reanudar el contexto de audio', err);
+          });
+        }
+      }
+
+      function getModeNoteContent(mode) {
+        if (mode === 'mic') {
+          return (
+            '<strong>Micrófono:</strong> Al seleccionarlo se solicitará permiso de acceso a tu micrófono. ' +
+            'Acepta la solicitud del navegador para comenzar a visualizar el audio capturado en tiempo real.'
+          );
+        }
+        if (mode === 'websocket') {
+          return (
+            '<strong>WebSocket:</strong> Conéctate a un servidor que envíe mensajes JSON con audio parametrizado. ' +
+            'Ejemplo de mensaje: <code>{"levels":{"bass":1.2,"mid":0.9},"samplesL":[128,140,...]}</code>. ' +
+            'Prueba el mock basado en ESP32 con micrófono disponible en <a href="https://github.com/espressif/esp-box/tree/master/examples/voice_recognition" target="_blank" rel="noreferrer">github.com/espressif/esp-box</a>.'
+          );
+        }
+        if (mode === 'local') {
+          return (
+            '<strong>Archivos locales:</strong> Carga archivos de audio desde tu equipo para reproducirlos en el visualizador.'
+          );
+        }
+        return '';
+      }
+
+      function setActiveMode(mode) {
+        if (activeMode === mode) {
+          $('#wsPanel').toggleClass('visible', mode === 'websocket');
+          return;
+        }
+        const previous = activeMode;
+        activeMode = mode;
+        $modeButtons.removeClass('active');
+        if (mode === 'local') {
+          $('#modeLocal').addClass('active');
+        } else if (mode === 'mic') {
+          $('#modeMic').addClass('active');
+        } else if (mode === 'websocket') {
+          $('#modeWebsocket').addClass('active');
+        }
+        $('#wsPanel').toggleClass('visible', mode === 'websocket');
+        if (previous === 'mic' && mode !== 'mic') {
+          stopMicStream();
+        }
+        syncPresetPanelHeight();
+        const noteContent = getModeNoteContent(mode);
+        if (noteContent) {
+          modeNote.html(noteContent);
+          modeNote.css('display', 'block');
+        } else {
+          modeNote.css('display', 'none');
+        }
+      }
+
+      function clearWebsocketPayload() {
+        websocketRenderPayload = null;
+      }
+
+      function computeVisualizerDimensions() {
+        const aspectRatio = 16 / 9;
+        const fallbackWidth = 960;
+
+        const isFullscreen =
+          document.fullscreenElement &&
+          (document.fullscreenElement === canvasWrapper ||
+            document.fullscreenElement.contains(canvasWrapper));
+
+        let availableWidth = fallbackWidth;
+        let viewportHeight = window.innerHeight ? window.innerHeight * 0.7 : fallbackWidth / aspectRatio;
+
+        if (isFullscreen) {
+          availableWidth = window.innerWidth || fallbackWidth;
+          viewportHeight = window.innerHeight || availableWidth / aspectRatio;
+        } else if (canvasWrapper) {
+          const measuredWidth = canvasWrapper.clientWidth || canvasWrapper.offsetWidth;
+          if (measuredWidth && measuredWidth > 0) {
+            availableWidth = measuredWidth;
+          } else {
+            const layoutEl = document.getElementById('layout');
+            if (layoutEl) {
+              const layoutWidth = layoutEl.clientWidth || layoutEl.offsetWidth;
+              if (layoutWidth && layoutWidth > 0) {
+                availableWidth = layoutWidth - 32;
+              }
+            }
+          }
+        } else if (document.documentElement && document.documentElement.clientWidth) {
+          availableWidth = document.documentElement.clientWidth * 0.9;
+        }
+
+        if (!isFullscreen) {
+          availableWidth = Math.min(availableWidth, 1280);
+        }
+
+        if (!Number.isFinite(availableWidth) || availableWidth <= 0) {
+          availableWidth = fallbackWidth;
+        }
+        if (!Number.isFinite(viewportHeight) || viewportHeight <= 0) {
+          viewportHeight = fallbackWidth / aspectRatio;
+        }
+
+        let width = availableWidth;
+        let height = width / aspectRatio;
+
+        if (height > viewportHeight) {
+          height = viewportHeight;
+          width = height * aspectRatio;
+        }
+
+        width = Math.round(Math.max(width, 320));
+        height = Math.round(Math.max(height, 180));
+
+        return { width, height };
+      }
+
+      function applyVisualizerDimensions({ width, height }) {
+        if (!width || !height) {
+          return;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        if (canvasWrapper) {
+          canvasWrapper.style.height = `${height}px`;
+          canvasWrapper.style.maxHeight = `${height}px`;
+        }
+        canvas.style.width = '100%';
+        canvas.style.maxHeight = `${height}px`;
+
+        if (visualizer) {
+          visualizer.setRendererSize(width, height);
+        }
+
+        syncPresetPanelHeight();
+        updateOverlayVisibility();
+      }
+
+      function resizeVisualizer() {
+        if (!canvas) {
+          return;
+        }
+        const dimensions = computeVisualizerDimensions();
+        applyVisualizerDimensions(dimensions);
+      }
+
+      function isInFullscreen() {
+        return (
+          document.fullscreenElement &&
+          (document.fullscreenElement === canvasWrapper ||
+            document.fullscreenElement.contains(canvasWrapper))
+        );
+      }
+
+      function updateOverlayVisibility() {
+        const overlay = document.getElementById('playerControlsOverlay');
+        if (!overlay) {
+          return;
+        }
+        if (isInFullscreen()) {
+          if (isOverlayHidden) {
+            overlay.classList.add('hidden');
+          } else {
+            overlay.classList.remove('hidden');
+          }
+        } else {
+          overlay.classList.remove('hidden');
+        }
+      }
+
+      function cancelControlsHideTimer() {
+        if (controlsHideTimeout) {
+          clearTimeout(controlsHideTimeout);
+          controlsHideTimeout = null;
+        }
+      }
+
+      function scheduleControlsHide() {
+        cancelControlsHideTimer();
+        if (!isInFullscreen()) {
+          return;
+        }
+        controlsHideTimeout = setTimeout(() => {
+          isOverlayHidden = true;
+          updateOverlayVisibility();
+        }, 1000);
+      }
+
+      function showControlsOverlay() {
+        isOverlayHidden = false;
+        updateOverlayVisibility();
+        scheduleControlsHide();
+      }
+
+      function handleFullscreenInteraction() {
+        if (!isInFullscreen()) {
+          return;
+        }
+        showControlsOverlay();
+      }
+
+      function enableFullscreenHideBehaviour() {
+        if (!canvasWrapper) {
+          return;
+        }
+        canvasWrapper.addEventListener('mousemove', handleFullscreenInteraction);
+        canvasWrapper.addEventListener('mousedown', handleFullscreenInteraction);
+        canvasWrapper.addEventListener('touchstart', handleFullscreenInteraction, {
+          passive: true,
+        });
+        showControlsOverlay();
+      }
+
+      function disableFullscreenHideBehaviour() {
+        if (!canvasWrapper) {
+          return;
+        }
+        canvasWrapper.removeEventListener('mousemove', handleFullscreenInteraction);
+        canvasWrapper.removeEventListener('mousedown', handleFullscreenInteraction);
+        canvasWrapper.removeEventListener('touchstart', handleFullscreenInteraction);
+        cancelControlsHideTimer();
+        isOverlayHidden = false;
+        updateOverlayVisibility();
+      }
+
+      function ensureWebsocketBuffers() {
+        if (!visualizer) {
+          return null;
+        }
+        if (!websocketBuffers) {
+          const size = visualizer.audio.fftSize;
+          websocketBuffers = {
+            timeByteArray: new Uint8Array(size),
+            timeByteArrayL: new Uint8Array(size),
+            timeByteArrayR: new Uint8Array(size),
+          };
+        }
+        return websocketBuffers;
+      }
+
+      function normalizedToByte(value) {
+        const clamped = Math.max(-1, Math.min(1, value));
+        return Math.round((clamped + 1) * 127.5);
+      }
+
+      function fillTimeArray(target, source) {
+        if (!source || !(Array.isArray(source) || ArrayBuffer.isView(source))) {
+          target.fill(128);
+          return false;
+        }
+        const length = Math.min(target.length, source.length);
+        for (let i = 0; i < length; i += 1) {
+          const sample = source[i];
+          let byte;
+          if (typeof sample === 'number' && Number.isFinite(sample)) {
+            if (sample >= 0 && sample <= 255) {
+              byte = Math.round(sample);
+            } else {
+              byte = normalizedToByte(sample);
+            }
+          } else {
+            byte = 128;
+          }
+          target[i] = Math.max(0, Math.min(255, byte));
+        }
+        for (let i = length; i < target.length; i += 1) {
+          target[i] = 128;
+        }
+        return length > 0;
+      }
+
+      function mergeStereoToMono(mono, left, right) {
+        for (let i = 0; i < mono.length; i += 1) {
+          mono[i] = Math.round((left[i] + right[i]) * 0.5);
+        }
+      }
+
+      function levelToAmplitude(value) {
+        if (!Number.isFinite(value)) {
+          return 0;
+        }
+        const clamped = Math.max(-5, Math.min(5, value));
+        return Math.abs(clamped) / 5;
+      }
+
+      function synthesizeFromLevels(levels, left, right, mono) {
+        const bass = levelToAmplitude(levels && levels.bass);
+        const mid = levelToAmplitude(levels && levels.mid);
+        const treb = levelToAmplitude(levels && levels.treb);
+        for (let i = 0; i < left.length; i += 1) {
+          const t = i / left.length;
+          const bassWave = Math.sin(2 * Math.PI * t) * bass;
+          const midWave = Math.sin(8 * Math.PI * t + 0.5) * mid;
+          const trebWave = Math.sin(20 * Math.PI * t + 1.2) * treb;
+          const l = bassWave + midWave + trebWave;
+          const r =
+            bassWave +
+            Math.sin(8 * Math.PI * t + 1.8) * mid +
+            Math.sin(20 * Math.PI * t + 2.4) * treb;
+          left[i] = normalizedToByte(l);
+          right[i] = normalizedToByte(r);
+        }
+        mergeStereoToMono(mono, left, right);
+      }
+
+      function extractLevels(data) {
+        const raw = data && (data.levels || data);
+        if (!raw || typeof raw !== 'object') {
+          return null;
+        }
+        const result = {};
+        let hasValue = false;
+        ['bass', 'bass_att', 'mid', 'mid_att', 'treb', 'treb_att'].forEach((key) => {
+          if (Number.isFinite(raw[key])) {
+            result[key] = raw[key];
+            hasValue = true;
+          }
+        });
+        return hasValue ? result : null;
+      }
+
+      function updateWebsocketStatus(message, type) {
+        const el = $('#wsStatus');
+        el.removeClass('error success');
+        if (type) {
+          el.addClass(type);
+        }
+        el.text(message || '');
+      }
+
+      function handleWebsocketMessage(event) {
+        const buffers = ensureWebsocketBuffers();
+        if (!buffers) {
+          return;
+        }
+        let payload;
+        try {
+          payload = JSON.parse(event.data);
+        } catch (err) {
+          console.warn('WebSocket payload inválido', err);
+          updateWebsocketStatus('Error: mensaje JSON inválido', 'error');
+          return;
+        }
+        const levels = extractLevels(payload);
+        const leftSource = payload.timeDomainL || payload.samplesL || payload.left;
+        const rightSource = payload.timeDomainR || payload.samplesR || payload.right;
+        const monoSource = payload.timeDomain || payload.samples;
+
+        const leftHasData = fillTimeArray(buffers.timeByteArrayL, leftSource);
+        const rightHasData = fillTimeArray(buffers.timeByteArrayR, rightSource);
+        const monoHasData = fillTimeArray(buffers.timeByteArray, monoSource);
+
+        if (!leftHasData && monoHasData) {
+          buffers.timeByteArrayL.set(buffers.timeByteArray);
+        }
+        if (!rightHasData && monoHasData) {
+          buffers.timeByteArrayR.set(buffers.timeByteArray);
+        }
+
+        if (!leftHasData && !rightHasData && !monoHasData) {
+          synthesizeFromLevels(levels || {}, buffers.timeByteArrayL, buffers.timeByteArrayR, buffers.timeByteArray);
+        } else if (!monoHasData) {
+          mergeStereoToMono(buffers.timeByteArray, buffers.timeByteArrayL, buffers.timeByteArrayR);
+        }
+
+        if (!leftHasData) {
+          buffers.timeByteArrayL.set(buffers.timeByteArray);
+        }
+        if (!rightHasData) {
+          buffers.timeByteArrayR.set(buffers.timeByteArray);
+        }
+
+        websocketRenderPayload = {
+          audio: buffers,
+          levels: levels || undefined,
+          elapsedTime: Number.isFinite(payload.elapsedTime) ? payload.elapsedTime : undefined,
+        };
+        updateWebsocketStatus('Último paquete recibido: ' + new Date().toLocaleTimeString(), 'success');
+        startRenderer();
+      }
+
+      function bindWebsocket(socket, url) {
+        socket.onopen = function() {
+          if (websocket !== socket) {
+            return;
+          }
+          updateWebsocketStatus('Conectado a ' + url, 'success');
+          resumeContextIfNeeded();
+          startRenderer();
+        };
+        socket.onerror = function(evt) {
+          if (websocket !== socket) {
+            return;
+          }
+          console.error('WebSocket error', evt);
+          updateWebsocketStatus('Error en la conexión', 'error');
+        };
+        socket.onclose = function() {
+          if (websocket !== socket) {
+            return;
+          }
+          websocket = null;
+          clearWebsocketPayload();
+          updateWebsocketStatus('Conexión cerrada');
+          $('#wsDisconnectBtn').prop('disabled', true);
+        };
+        socket.onmessage = function(evt) {
+          if (websocket !== socket) {
+            return;
+          }
+          handleWebsocketMessage(evt);
+        };
+      }
+
+      function connectToAudioAnalyzer(node) {
+        if (delayedAudible) {
+          delayedAudible.disconnect();
+        }
+
+        delayedAudible = audioContext.createDelay();
+        delayedAudible.delayTime.value = 0.26;
+
+        node.connect(delayedAudible);
+        delayedAudible.connect(audioContext.destination);
+
+        visualizer.connectAudio(delayedAudible);
+      }
+
+      function renderFrame() {
+        if (!rendering) {
+          animationFrameId = null;
+          return;
+        }
+        const now = performance.now();
+        if (lastFrameTime !== null) {
+          const delta = now - lastFrameTime;
+          if (delta > 0 && delta < 1000) {
+            currentFps = 1000 / delta;
+          }
+        }
+        lastFrameTime = now;
+        if (websocketRenderPayload && activeMode === 'websocket') {
+          visualizer.render({
+            audioLevels: websocketRenderPayload.audio,
+            sensorLevels: websocketRenderPayload.levels,
+            elapsedTime: websocketRenderPayload.elapsedTime,
+          });
+        } else {
+          visualizer.render();
+        }
+        if (showFps) {
+          if (lastFpsUpdateTime === 0 || now - lastFpsUpdateTime >= 1000) {
+            const displayValue = currentFps > 0 ? `${Math.round(currentFps)} FPS` : '--';
+            fpsDisplay.text(displayValue);
+            lastFpsUpdateTime = now;
+          }
+        }
+        animationFrameId = requestAnimationFrame(renderFrame);
+      }
+
+      function startRenderer() {
+        if (isPaused || rendering) {
+          return;
+        }
+        rendering = true;
+        lastFrameTime = null;
+        currentFps = 0;
+        lastFpsUpdateTime = 0;
+        if (showFps) {
+          fpsDisplay.text('--');
+        }
+        animationFrameId = requestAnimationFrame(renderFrame);
+      }
+
+      function playBufferSource(buffer) {
+        clearWebsocketPayload();
+        stopMicStream();
+
+        if (sourceNode) {
+          try {
+            sourceNode.disconnect();
+          } catch (err) {
+            console.warn('Error al desconectar el nodo de audio', err);
+          }
+        }
+
+        sourceNode = audioContext.createBufferSource();
+        sourceNode.buffer = buffer;
+        connectToAudioAnalyzer(sourceNode);
+
+        startRenderer();
+        sourceNode.start(0);
+      }
+
+      function loadLocalFiles(files, index = 0) {
+        if (!files || !files.length) {
+          return;
+        }
+        setActiveMode('local');
+        resumeContextIfNeeded();
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          audioContext.decodeAudioData(event.target.result, (decodedBuffer) => {
+            playBufferSource(decodedBuffer);
+
+            window.setTimeout(() => {
+              if (files.length > index + 1) {
+                loadLocalFiles(files, index + 1);
+              } else if (sourceNode) {
+                try {
+                  sourceNode.disconnect();
+                } catch (err) {
+                  console.warn('Error al detener la reproducción local', err);
+                }
+                sourceNode = null;
+              }
+            }, decodedBuffer.duration * 1000);
+          });
+        };
+
+        const file = files[index];
+        reader.readAsArrayBuffer(file);
+      }
+
+      function connectMicAudio(source) {
+        setActiveMode('mic');
+        resumeContextIfNeeded();
+
+        if (micGainNode) {
+          if (visualizer) {
+            visualizer.disconnectAudio(micGainNode);
+          }
+          try {
+            micGainNode.disconnect();
+          } catch (err) {
+            console.warn('Error al limpiar el nodo del micrófono previo', err);
+          }
+        }
+
+        micGainNode = audioContext.createGain();
+        micGainNode.gain.value = 1.25;
+        source.connect(micGainNode);
+
+        visualizer.connectAudio(micGainNode);
+        startRenderer();
+      }
+
+      function highlightPreset(index) {
+        $('#presetList .preset-item').removeClass('active');
+        const item = $('#presetList .preset-item[data-index="' + index + '"]');
+        item.addClass('active');
+        if (item.length && item[0].scrollIntoView) {
+          item[0].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }
+
+      function loadPresetFromList(index, blendTime = 5.7, trackHistory = true) {
+        if (!presetKeys.length || index < 0 || index >= presetKeys.length) {
+          return;
+        }
+        if (trackHistory) {
+          presetIndexHist.push(presetIndex);
+        }
+        presetIndex = index;
+        visualizer.loadPreset(presets[presetKeys[presetIndex]], blendTime);
+        highlightPreset(presetIndex);
+        restartCycleInterval();
+        syncPresetPanelHeight();
+      }
+
+      function nextPreset(blendTime = 5.7) {
+        if (!presetKeys.length) {
+          return;
+        }
+        presetIndexHist.push(presetIndex);
+        const numPresets = presetKeys.length;
+        const nextIndex = presetRandom
+          ? Math.floor(Math.random() * numPresets)
+          : (presetIndex + 1) % numPresets;
+        loadPresetFromList(nextIndex, blendTime, false);
+      }
+
+      function prevPreset(blendTime = 5.7) {
+        if (!presetKeys.length) {
+          return;
+        }
+        if (presetIndexHist.length > 0) {
+          const previous = presetIndexHist.pop();
+          loadPresetFromList(previous, blendTime, false);
+        } else {
+          const numPresets = presetKeys.length;
+          const previousIndex = (presetIndex - 1 + numPresets) % numPresets;
+          loadPresetFromList(previousIndex, blendTime, false);
+        }
+      }
+
+      function restartCycleInterval() {
+        if (cycleInterval) {
+          clearInterval(cycleInterval);
+          cycleInterval = null;
+        }
+
+        if (presetCycle && !isPaused) {
+          cycleInterval = setInterval(() => nextPreset(2.7), presetCycleLength);
+        }
+      }
+
+      function getFileSafePresetName(name) {
+        return name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '');
+      }
+
+      async function fetchThumbnail(fileSafeName) {
+        const fileName = `${fileSafeName || 'preset'}.gif`;
+        const localPath = `./thumbnails/${fileName}`;
+        try {
+          const response = await fetch(localPath, {
+            method: 'HEAD',
+            cache: 'no-cache',
+          });
+          if (response.ok) {
+            return localPath;
+          }
+        } catch (err) {
+          // ignore and fallback to placeholder
+        }
+        return null;
+      }
+
+      function renderPresetRecommendations() {
+        presetListElement.empty();
+
+        const fragment = document.createDocumentFragment();
+        const tasks = presetKeys.map((key, i) => {
+          const parts = key.split(' - ');
+          const titleText = parts[0] ? parts[0].trim() : key;
+          const authorText = parts.length > 1 ? parts.slice(1).join(' - ').trim() : 'Preset recomendado';
+          const fileSafe = getFileSafePresetName(key);
+
+          return fetchThumbnail(fileSafe).then((thumbnailSrc) => {
+            const li = document.createElement('li');
+            li.className = 'preset-item';
+            li.setAttribute('data-index', String(i));
+
+            const thumb = document.createElement('div');
+            thumb.className = 'preset-thumbnail';
+            if (thumbnailSrc) {
+              const img = document.createElement('img');
+              img.src = thumbnailSrc;
+              img.alt = `Miniatura de ${titleText}`;
+              img.loading = 'lazy';
+              thumb.appendChild(img);
+            } else {
+              thumb.textContent = String(i + 1).padStart(2, '0');
+            }
+
+            const meta = document.createElement('div');
+            meta.className = 'preset-meta';
+
+            const title = document.createElement('div');
+            title.className = 'preset-title';
+            title.textContent = titleText;
+
+            const info = document.createElement('div');
+            info.className = 'preset-info';
+            info.textContent = authorText;
+
+            meta.appendChild(title);
+            meta.appendChild(info);
+
+            li.appendChild(thumb);
+            li.appendChild(meta);
+
+            li.addEventListener('click', () => {
+              if (i === presetIndex) {
+                visualizer.loadPreset(presets[presetKeys[presetIndex]], 0);
+                return;
+              }
+              loadPresetFromList(i, 2.0);
+            });
+
+            fragment.appendChild(li);
+          });
+        });
+
+        Promise.all(tasks).then(() => {
+          presetListElement[0].appendChild(fragment);
+          highlightPreset(presetIndex);
+          syncPresetPanelHeight();
+        });
+      }
+
+      function initPlayer() {
+        audioContext = new AudioContext();
+
+        presets = {};
+        if (window.base && window.base.default) {
+          Object.assign(presets, window.base.default);
+        }
+        if (window.extra && window.extra.default) {
+          Object.assign(presets, window.extra.default);
+        }
+        presets = _(presets).toPairs().sortBy(([k]) => k.toLowerCase()).fromPairs().value();
+        presetKeys = _.keys(presets);
+
+        if (!presetKeys.length) {
+          updateWebsocketStatus('No se encontraron presets disponibles', 'error');
+          return;
+        }
+
+        presetIndex = Math.floor(Math.random() * presetKeys.length);
+        renderPresetRecommendations();
+
+        const initialDimensions = computeVisualizerDimensions();
+        applyVisualizerDimensions(initialDimensions);
+
+        visualizer = butterchurn.createVisualizer(audioContext, canvas, {
+          width: initialDimensions.width,
+          height: initialDimensions.height,
+          pixelRatio: window.devicePixelRatio || 1,
+          textureRatio: 1,
+        });
+
+        applyVisualizerDimensions(initialDimensions);
+
+        loadPresetFromList(presetIndex, 0, false);
+        restartCycleInterval();
+      }
+
+      $(document).keydown((e) => {
+        if (e.which === 32 || e.which === 39) {
+          nextPreset();
+        } else if (e.which === 8 || e.which === 37) {
+          prevPreset();
+        } else if (e.which === 72) {
+          nextPreset(0);
+        }
+      });
+
+      $('#autoplayToggle').change(() => {
+        presetCycle = $('#autoplayToggle').is(':checked');
+        restartCycleInterval();
+        updateAutoplayUI();
+      });
+
+      $('#autoplaySeconds').on('change input', () => {
+        const raw = Number($('#autoplaySeconds').val());
+        const sanitized = Number.isFinite(raw) && raw >= 1 ? raw : 15;
+        $('#autoplaySeconds').val(sanitized);
+        presetCycleLength = sanitized * 1000;
+        restartCycleInterval();
+      });
+
+      $('#randomToggle').change(() => {
+        presetRandom = $('#randomToggle').is(':checked');
+      });
+
+      $('#modeLocal').click(() => {
+        setActiveMode('local');
+        localFileInput.click();
+      });
+
+      $('#modeMic').click(() => {
+        function handleStream(stream) {
+          micStream = stream;
+          const micSourceNode = audioContext.createMediaStreamSource(stream);
+          connectMicAudio(micSourceNode);
+        }
+
+        setActiveMode('mic');
+        clearWebsocketPayload();
+
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          navigator.mediaDevices
+            .getUserMedia({ audio: true })
+            .then(handleStream)
+            .catch((err) => {
+              console.error('Error al acceder al micrófono', err);
+              alert('No se pudo acceder al micrófono. Revisa los permisos del navegador.');
+            });
+        } else if (navigator.getUserMedia) {
+          navigator.getUserMedia(
+            { audio: true },
+            handleStream,
+            (err) => {
+              console.error('Error al acceder al micrófono', err);
+              alert('No se pudo acceder al micrófono.');
+            }
+          );
+        } else {
+          alert('El navegador no soporta captura de audio.');
+        }
+      });
+
+      $('#modeWebsocket').click(() => {
+        setActiveMode('websocket');
+        clearWebsocketPayload();
+        $('#wsHost').focus();
+      });
+
+      playPauseBtn.on('click', () => {
+        if (isPaused) {
+          resumePlayback();
+        } else {
+          pausePlayback();
+        }
+        showControlsOverlay();
+      });
+
+      fullscreenBtn.on('click', () => {
+        if (document.fullscreenElement) {
+          const exit =
+            document.exitFullscreen ||
+            document.webkitExitFullscreen ||
+            document.mozCancelFullScreen ||
+            document.msExitFullscreen;
+          if (exit) {
+            try {
+              const result = exit.call(document);
+              if (result && typeof result.catch === 'function') {
+                result.catch((err) => {
+                  console.warn('No se pudo salir del modo pantalla completa', err);
+                });
+              }
+            } catch (err) {
+              console.warn('No se pudo salir del modo pantalla completa', err);
+            }
+          }
+        } else {
+        const request =
+          canvasWrapper.requestFullscreen ||
+          canvasWrapper.webkitRequestFullscreen ||
+          canvasWrapper.mozRequestFullScreen ||
+          canvasWrapper.msRequestFullscreen;
+          if (request) {
+            try {
+              const result = request.call(canvasWrapper);
+              if (result && typeof result.catch === 'function') {
+                result.catch((err) => {
+                  console.warn('No se pudo activar la pantalla completa', err);
+                });
+              }
+            } catch (err) {
+              console.warn('No se pudo activar la pantalla completa', err);
+            }
+          } else {
+            console.warn('Pantalla completa no soportada en este navegador');
+          }
+        }
+      });
+
+      fpsToggleBtn.on('click', () => {
+        showFps = !showFps;
+        if (showFps) {
+          lastFrameTime = null;
+          currentFps = 0;
+          lastFpsUpdateTime = 0;
+          fpsDisplay.text('--');
+        }
+        updateFpsVisibility();
+      });
+
+      const fullscreenEvents = [
+        'fullscreenchange',
+        'webkitfullscreenchange',
+        'mozfullscreenchange',
+        'MSFullscreenChange',
+      ];
+      fullscreenEvents.forEach((eventName) => {
+        document.addEventListener(eventName, () => {
+          updateFullscreenButton();
+          window.requestAnimationFrame(resizeVisualizer);
+        });
+      });
+
+      $(window).on('resize', () => {
+        window.requestAnimationFrame(resizeVisualizer);
+      });
+
+      localFileInput.addEventListener('change', (event) => {
+        const { files } = event.target;
+        if (files && files.length) {
+          clearWebsocketPayload();
+          loadLocalFiles(files);
+        }
+        localFileInput.value = '';
+      });
+
+      $('#presetList').on('click', '.preset-item', function() {
+        const index = parseInt($(this).attr('data-index'), 10);
+        if (Number.isNaN(index)) {
+          return;
+        }
+        if (index === presetIndex) {
+          visualizer.loadPreset(presets[presetKeys[presetIndex]], 0);
+          return;
+        }
+        loadPresetFromList(index, 2.0);
+      });
+
+      $('#wsConnectBtn').click(() => {
+        setActiveMode('websocket');
+        const host = $('#wsHost').val().trim();
+        const port = $('#wsPort').val().trim();
+        const protocol = $('#wsProtocol').val();
+        const path = $('#wsPath').val().trim();
+
+        if (!host) {
+          updateWebsocketStatus('Ingresa una IP o dominio', 'error');
+          return;
+        }
+        if (!port) {
+          updateWebsocketStatus('Ingresa un puerto', 'error');
+          return;
+        }
+
+        let url = protocol + '://' + host + ':' + port;
+        if (path) {
+          url += path.startsWith('/') ? path : '/' + path;
+        }
+
+        clearWebsocketPayload();
+        if (websocket) {
+          websocket.close();
+        }
+
+        try {
+          websocket = new WebSocket(url);
+        } catch (err) {
+          console.error('WebSocket init error', err);
+          updateWebsocketStatus('No se pudo crear la conexión', 'error');
+          websocket = null;
+          return;
+        }
+
+        updateWebsocketStatus('Conectando a ' + url + ' ...');
+        $('#wsDisconnectBtn').prop('disabled', false);
+        bindWebsocket(websocket, url);
+      });
+
+      $('#wsDisconnectBtn').click(() => {
+        if (websocket) {
+          updateWebsocketStatus('Cerrando conexión...');
+          websocket.close();
+        } else {
+          updateWebsocketStatus('Sin conexión activa');
+        }
+      });
+
+      initPlayer();
+      setActiveMode('mic');
+      updateWebsocketStatus('Introduce la IP o dominio y puerto del servidor WebSocket');
+      updatePlayPauseButton();
+      updateFullscreenButton();
+      updateFpsVisibility();
+      updateAutoplayUI();
+      resizeVisualizer();
+
+      window.__butterchurnDemo = {
+        getPresetKeys: () => presetKeys.slice(),
+        loadPreset: (name, { blendTime = 0 } = {}) => {
+          const idx = presetKeys.indexOf(name);
+          if (idx === -1) {
+            return false;
+          }
+          loadPresetFromList(idx, blendTime, false);
+          return true;
+        },
+        resume: () => {
+          resumePlayback();
+        },
+        pause: () => {
+          pausePlayback();
+        },
+        captureFrame: () => {
+          return canvas.toDataURL('image/png');
+        },
+        getCanvasSize: () => ({ width: canvas.width, height: canvas.height }),
+      };
+      window.__butterchurnDemoReady = true;
+    });
+  </script>
+</head>
+<body>
+  <div id="app">
+    <div id="layout">
+      <header id="modeBar">
+        <div class="mode-left">
+          <div class="brand">Butterchurn</div>
+        </div>
+        <div class="mode-buttons">
+          <button id="modeLocal" class="mode-button">Archivo</button>
+          <button id="modeMic" class="mode-button">Micrófono</button>
+          <button id="modeWebsocket" class="mode-button">WebSocket</button>
+        </div>
+    </header>
+    <input type="file" id="localFileInput" accept="audio/*" multiple style="display:none" />
+    <div id="content">
+      <main id="playerArea">
+        <div id="modeNote" class="mode-note"></div>
+        <div id="canvasWrapper">
+            <canvas id="canvas" width="960" height="540"></canvas>
+            <div id="playerControlsOverlay">
+              <button
+              id="playPauseBtn"
+              class="player-control-button"
+              type="button"
+              aria-label="Pausar visualización"
+              title="Pausar visualización"
+            >⏸</button>
+            <button
+              id="fullscreenBtn"
+              class="player-control-button"
+              type="button"
+              aria-label="Pantalla completa"
+              title="Pantalla completa"
+            >⛶</button>
+            <button
+              id="fpsToggleBtn"
+              class="player-control-button secondary"
+              type="button"
+              aria-pressed="false"
+              aria-label="Mostrar FPS"
+              title="Mostrar FPS"
+            >FPS</button>
+            <div id="fpsDisplay" aria-live="polite">--</div>
+          </div>
+        </div>
+        <section id="wsPanel" class="mode-panel">
+          <h2>Conexión WebSocket</h2>
+          <div class="panel-grid">
+            <label>
+              Protocolo
+              <select id="wsProtocol">
+                <option value="ws">ws://</option>
+                <option value="wss">wss://</option>
+              </select>
+            </label>
+            <label>
+              IP o dominio
+              <input id="wsHost" placeholder="127.0.0.1" />
+            </label>
+            <label>
+              Puerto
+              <input id="wsPort" type="number" min="1" max="65535" placeholder="8080" />
+            </label>
+            <label>
+              Ruta (opcional)
+              <input id="wsPath" placeholder="/stream" />
+            </label>
+          </div>
+          <div class="panel-actions">
+            <button id="wsConnectBtn" type="button">Conectar</button>
+            <button id="wsDisconnectBtn" type="button" class="secondary" disabled>Desconectar</button>
+          </div>
+          <div id="wsStatus"></div>
+        </section>
+      </main>
+      <aside id="presetSidebar">
+        <div id="presetToolbar">
+          <label>
+            <input type="checkbox" id="autoplayToggle" />
+            <span>Autorreproducción</span>
+          </label>
+          <div id="autoplayDetails">
+            <label>
+              Intervalo (s)
+              <input type="number" id="autoplaySeconds" min="1" value="15" />
+            </label>
+            <label>
+              <input type="checkbox" id="randomToggle" />
+              <span>Aleatorio</span>
+            </label>
+          </div>
+        </div>
+        <h3>Presets</h3>
+        <ul id="presetList"></ul>
+      </aside>
+    </div>
+    </div>
+  </div>
+</body>
+</html>
